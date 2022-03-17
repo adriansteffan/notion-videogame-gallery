@@ -1,0 +1,33 @@
+"""
+Create a Steam-Grid-API-Key here
+https://www.steamgriddb.com/profile/preferences/api
+"""
+STEAM_GRID_KEY = ""
+
+"""
+Create an application, client_id and API secret for IGDB here
+https://api-docs.igdb.com/#account-creation
+"""
+IGDB_CLIENT_ID = ""
+IGDB_SECRET = ""
+
+"""
+Create an application, and a Youtube API Key here
+https://developers.google.com/youtube/v3/quickstart/python
+"""
+YT_API_KEY = ""
+
+"""
+Create an application (all capabilities), and a "Internal Integration Token" here 
+https://developers.notion.com/docs/getting-started#step-1-create-an-integration
+"""
+NOTION_API_KEY = ""
+
+"""
+Sher your database with the integration and specify the link to it below
+https://developers.notion.com/docs/getting-started#step-2-share-a-database-with-your-integration
+"""
+LINK_TO_DATABASE = ""
+
+DATABASE_ID = LINK_TO_DATABASE.split('/')[-1].split('?')[0]
+
