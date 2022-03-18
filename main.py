@@ -8,7 +8,6 @@ import googleapiclient.discovery
 
 import config
 
-# TODO Documentation
 
 PRIO_ORIGINAL_STEAM_ICONS = False
 
@@ -46,6 +45,7 @@ def fail_notion(page_id):
             }
         })
     )
+
 
 def check_and_update_notion():
     r_db = requests.post(
@@ -456,7 +456,6 @@ class GameData:
         return item['url'], item['author']['name']
 
     def __fetch_meta_data(self):
-
 
         # HLTB
         results = HowLongToBeat().search(self.name)
