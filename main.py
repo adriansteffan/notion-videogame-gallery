@@ -8,7 +8,7 @@ import googleapiclient.discovery
 
 import config
 
-# TODO Documentation, credit
+# TODO Documentation
 
 PRIO_ORIGINAL_STEAM_ICONS = False
 
@@ -140,26 +140,23 @@ def check_and_update_notion():
 
         # Update page content
 
-        if game['properties']['Data Fetched']['select']['name'] != LOAD_ALL_OPTION:
-            return
-
         page_children = []
 
         def text_block(text):
             return {
-                    "object": "block",
-                    "type": "paragraph",
-                    "paragraph": {
-                        "rich_text": [
-                            {
-                                "type": "text",
-                                "text": {
-                                    "content": text,
-                                }
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [
+                        {
+                            "type": "text",
+                            "text": {
+                                "content": text,
                             }
-                        ]
-                    }
+                        }
+                    ]
                 }
+            }
 
         def link_block(text, url):
             return {
@@ -198,138 +195,150 @@ def check_and_update_notion():
 
         def ext_img_block(url):
             return {
+                "object": "block",
+                "type": "image",
+                "image": {
+                    "type": "external",
+                    "external": {
+                        "url": url
+                    }
+                }
+            }
+
+        if game['properties']['Data Fetched']['select']['name'] == LOAD_ALL_OPTION:
+
+            if gd.release_date is not None:
+                page_children.append(text_block(f"Release Date: {gd.release_date}"))
+
+            if gd.wikipedia_link is not None:
+                page_children.append(link_block("Wikipedia", gd.wikipedia_link))
+
+            if gd.igdb_description is not None:
+                page_children.append(text_block(gd.igdb_description))
+
+            if gd.time_to_beat_weblink is not None:
+
+                page_children.append(text_block(" "))
+                page_children.append({
                     "object": "block",
-                    "type": "image",
-                    "image": {
+                    "type": "paragraph",
+                    "paragraph": {
+                        "rich_text": [
+                            {
+                                "type": "text",
+                                "text": {
+                                    "content": "How Long To Beat Data:",
+                                    "link": {"url": gd.time_to_beat_weblink}
+                                },
+                                "annotations": {
+                                    "bold": False,
+                                    "italic": False,
+                                    "strikethrough": False,
+                                    "underline": True,
+                                    "code": False,
+                                    "color": "default"
+                                },
+                            }
+                        ]
+                    }
+                })
+
+                page_children.append({
+                    "object": "block",
+                    "type": "column_list",
+                    "column_list": {
+                        "children": [
+                            {
+                                "object": "block",
+                                "type": "column",
+                                "column": {"children": [
+                                    callout_block(f"Normal: {gd.time_to_beat_main}", "🏁", "yellow_background")
+                                ]}
+                            },
+                            {
+                                "object": "block",
+                                "type": "column",
+                                "column": {"children": [
+                                    callout_block(f"Main+Extra: {gd.time_to_beat_extra}", "📌", "yellow_background")
+                                ]}
+                            },
+                            {
+                                "object": "block",
+                                "type": "column",
+                                "column": {"children": [
+                                    callout_block(f" Completion: {gd.time_to_beat_completionist}", "✅", "yellow_background")
+                                ]}
+                            },
+                        ]
+                    }
+                })
+
+            if gd.yt_trailer is not None:
+                page_children.append(text_block(" "))
+                page_children.append({
+                    "object": "block",
+                    "type": "video",
+                    "video": {
                       "type": "external",
                       "external": {
-                          "url": url
+                          "url": gd.yt_trailer
                       }
                     }
-                }
+                })
 
-        if gd.release_date is not None:
-            page_children.append(text_block(f"Release Date: {gd.release_date}"))
+            if gd.igdb_images is not None:
 
-        if gd.wikipedia_link is not None:
-            page_children.append(link_block("Wikipedia", gd.wikipedia_link))
+                # the spacing of two separate columns looks off, so we are using rows of columns instead
 
-        if gd.igdb_description is not None:
-            page_children.append(text_block(gd.igdb_description))
-
-        if gd.time_to_beat_weblink is not None:
-
-            page_children.append(text_block(" "))
-            page_children.append({
-                "object": "block",
-                "type": "paragraph",
-                "paragraph": {
-                    "rich_text": [
-                        {
-                            "type": "text",
-                            "text": {
-                                "content": "How Long To Beat Data:",
-                                "link": {"url": gd.time_to_beat_weblink}
-                            },
-                            "annotations": {
-                                "bold": False,
-                                "italic": False,
-                                "strikethrough": False,
-                                "underline": True,
-                                "code": False,
-                                "color": "default"
-                            },
+                for i in range(1, len(gd.igdb_images), 2):
+                    page_children.append({
+                        "object": "block",
+                        "type": "column_list",
+                        "column_list": {
+                            "children": [
+                                {
+                                    "object": "block",
+                                    "type": "column",
+                                    "column": {"children": [ext_img_block(gd.igdb_images[i - 1])]}
+                                },
+                                {
+                                    "object": "block",
+                                    "type": "column",
+                                    "column": {"children": [ext_img_block(gd.igdb_images[i])]}
+                                },
+                            ]
                         }
-                    ]
-                }
-            })
+                    })
 
-            page_children.append({
-                "object": "block",
-                "type": "column_list",
-                "column_list": {
-                    "children": [
-                        {
-                            "object": "block",
-                            "type": "column",
-                            "column": {"children": [
-                                callout_block(f"Normal: {gd.time_to_beat_main}", "🏁", "yellow_background")
-                            ]}
-                        },
-                        {
-                            "object": "block",
-                            "type": "column",
-                            "column": {"children": [
-                                callout_block(f"Main+Extra: {gd.time_to_beat_extra}", "📌", "yellow_background")
-                            ]}
-                        },
-                        {
-                            "object": "block",
-                            "type": "column",
-                            "column": {"children": [
-                                callout_block(f" Completion: {gd.time_to_beat_completionist}", "✅", "yellow_background")
-                            ]}
-                        },
-                    ]
-                }
-            })
+                if len(gd.igdb_images) % 2 != 0:
+                    page_children.append({
+                        "object": "block",
+                        "type": "column_list",
+                        "column_list": {
+                            "children": [
+                                {
+                                    "object": "block",
+                                    "type": "column",
+                                    "column": {"children": [ext_img_block(gd.igdb_images[-1])]}
+                                },
+                                {
+                                    "object": "block",
+                                    "type": "column",
+                                    "column": {"children": [text_block(" ")]}
+                                },
+                            ]
+                        }
+                    })
 
-        if gd.yt_trailer is not None:
-            page_children.append(text_block(" "))
-            page_children.append({
-                "object": "block",
-                "type": "video",
-                "video": {
-                  "type": "external",
-                  "external": {
-                      "url": gd.yt_trailer
-                  }
-                }
-            })
+        if gd.grid_credits_icon is not None:
+            page_children.append(text_block(f"Icon Credit: {gd.grid_credits_icon} on SteamGrid"))
+        if gd.grid_credits_front is not None:
+            page_children.append(text_block(f"Grid Credit: {gd.grid_credits_front} on SteamGrid"))
+        if gd.grid_credits_hero is not None:
+            page_children.append(text_block(f"Hero Credit: {gd.grid_credits_hero} on SteamGrid"))
 
-        if gd.igdb_images is not None:
-
-            # the spacing of two separate columns looks off, so we are using rows of columns instead
-
-            for i in range(1, len(gd.igdb_images), 2):
-                page_children.append({
-                    "object": "block",
-                    "type": "column_list",
-                    "column_list": {
-                        "children": [
-                            {
-                                "object": "block",
-                                "type": "column",
-                                "column": {"children": [ext_img_block(gd.igdb_images[i - 1])]}
-                            },
-                            {
-                                "object": "block",
-                                "type": "column",
-                                "column": {"children": [ext_img_block(gd.igdb_images[i])]}
-                            },
-                        ]
-                    }
-                })
-
-            if len(gd.igdb_images) % 2 != 0:
-                page_children.append({
-                    "object": "block",
-                    "type": "column_list",
-                    "column_list": {
-                        "children": [
-                            {
-                                "object": "block",
-                                "type": "column",
-                                "column": {"children": [ext_img_block(gd.igdb_images[-1])]}
-                            },
-                            {
-                                "object": "block",
-                                "type": "column",
-                                "column": {"children": [text_block(" ")]}
-                            },
-                        ]
-                    }
-                })
+        if len(page_children) == 0:
+            return
 
         r_page_content = requests.patch(
             f"{NOTION_BASE_URL}/blocks/{game['id']}/children",
@@ -338,6 +347,7 @@ def check_and_update_notion():
                 'children': page_children
             })
         )
+
 
 
 class GameData:
