@@ -1,11 +1,12 @@
 import requests
 from datetime import datetime
 import json
-
-import config
+import time
 
 from howlongtobeatpy import HowLongToBeat
 import googleapiclient.discovery
+
+import config
 
 # TODO HLTB fix, Autorun, Deployment, Documentation
 
@@ -313,9 +314,6 @@ def check_and_update_notion():
         )
 
 
-
-
-
 class GameData:
 
     def __init__(self):
@@ -479,4 +477,10 @@ class GameData:
 
 
 if __name__ == "__main__":
-    check_and_update_notion()
+    # Not the cleanest solution, but works for the simple purpose of this tool.
+    # Delaying for x seconds after execution instead of executing every x seconds is actually the intended behavior in
+    # order to avoid collisions if the Notion API takes longer x seconds to respond.
+    while True:
+        check_and_update_notion()
+        time.sleep(3)
+
