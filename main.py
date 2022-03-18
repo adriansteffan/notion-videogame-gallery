@@ -7,7 +7,7 @@ import config
 from howlongtobeatpy import HowLongToBeat
 import googleapiclient.discovery
 
-# TODO Autorun, Deployment, Documentation
+# TODO HLTB fix, Autorun, Deployment, Documentation
 
 PRIO_ORIGINAL_STEAM_ICONS = False
 
@@ -29,7 +29,6 @@ def igdb_headers(igdb_token):
 
 
 def check_and_update_notion():
-
     r_db = requests.post(
         f"{NOTION_BASE_URL}/databases/{config.DATABASE_ID}/query",
         headers=notion_headers,
@@ -110,7 +109,211 @@ def check_and_update_notion():
             data=json.dumps(update_data)
         )
 
-        # TODO: Update Content
+        page_children = []
+
+        def text_block(text):
+            return {
+                    "object": "block",
+                    "type": "paragraph",
+                    "paragraph": {
+                        "rich_text": [
+                            {
+                                "type": "text",
+                                "text": {
+                                    "content": text,
+                                }
+                            }
+                        ]
+                    }
+                }
+
+        def link_block(text, url):
+            return {
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [
+                        {
+                            "type": "text",
+                            "text": {
+                                "content": text,
+                                "link": {"url": url}
+                            }
+                        }
+                    ]
+                }
+            }
+
+        def callout_block(text, emoji, color="default"):
+            return {
+                "object": "block",
+                "type": "callout",
+                "callout": {
+                    "rich_text": [{
+                        "type": "text",
+                        "text": {
+                            "content": text,
+                        },
+                    }],
+                    "icon": {
+                        "emoji": emoji
+                    },
+                    "color": color
+                }
+            }
+
+        def ext_img_block(url):
+            return {
+                    "object": "block",
+                    "type": "image",
+                    "image": {
+                      "type": "external",
+                      "external": {
+                          "url": url
+                      }
+                    }
+                }
+
+        if gd.release_date is not None:
+            page_children.append(text_block(f"Release Date: {gd.release_date}"))
+
+        if gd.wikipedia_link is not None:
+            page_children.append(link_block("Wikipedia", gd.wikipedia_link))
+
+        if gd.igdb_description is not None:
+            page_children.append(text_block(gd.igdb_description))
+
+        # REMOVE ONCE FIXED
+            gd.time_to_beat_weblink = "https://google.com"
+            gd.time_to_beat_main = "50 m"
+            gd.time_to_beat_extra = "5 h"
+            gd.time_to_beat_completionist = "20 h"
+        # REMOVE ONCE FIXED
+
+        if gd.time_to_beat_weblink is not None:
+
+            page_children.append(text_block(" "))
+            page_children.append({
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [
+                        {
+                            "type": "text",
+                            "text": {
+                                "content": "How Long To Beat Data:",
+                                "link": {"url": gd.time_to_beat_weblink}
+                            },
+                            "annotations": {
+                                "bold": False,
+                                "italic": False,
+                                "strikethrough": False,
+                                "underline": True,
+                                "code": False,
+                                "color": "default"
+                            },
+                        }
+                    ]
+                }
+            })
+
+            page_children.append({
+                "object": "block",
+                "type": "column_list",
+                "column_list": {
+                    "children": [
+                        {
+                            "object": "block",
+                            "type": "column",
+                            "column": {"children": [
+                                callout_block(f"Normal: {gd.time_to_beat_main}", "🏁", "yellow_background")
+                            ]}
+                        },
+                        {
+                            "object": "block",
+                            "type": "column",
+                            "column": {"children": [
+                                callout_block(f"Main+Extra: {gd.time_to_beat_extra}", "📌", "yellow_background")
+                            ]}
+                        },
+                        {
+                            "object": "block",
+                            "type": "column",
+                            "column": {"children": [
+                                callout_block(f" Completion: {gd.time_to_beat_completionist}", "✅", "yellow_background")
+                            ]}
+                        },
+                    ]
+                }
+            })
+
+        if gd.yt_trailer is not None:
+            page_children.append(text_block(" "))
+            page_children.append({
+                "object": "block",
+                "type": "video",
+                "video": {
+                  "type": "external",
+                  "external": {
+                      "url": gd.yt_trailer
+                  }
+                }
+            })
+
+        if gd.igdb_images is not None:
+
+            # the spacing of two separate columns looks off, so we are using rows of columns instead
+
+            for i in range(1, len(gd.igdb_images), 2):
+                page_children.append({
+                    "object": "block",
+                    "type": "column_list",
+                    "column_list": {
+                        "children": [
+                            {
+                                "object": "block",
+                                "type": "column",
+                                "column": {"children": [ext_img_block(gd.igdb_images[i - 1])]}
+                            },
+                            {
+                                "object": "block",
+                                "type": "column",
+                                "column": {"children": [ext_img_block(gd.igdb_images[i])]}
+                            },
+                        ]
+                    }
+                })
+
+            if len(gd.igdb_images) % 2 != 0:
+                page_children.append({
+                    "object": "block",
+                    "type": "column_list",
+                    "column_list": {
+                        "children": [
+                            {
+                                "object": "block",
+                                "type": "column",
+                                "column": {"children": [ext_img_block(gd.igdb_images[-1])]}
+                            },
+                            {
+                                "object": "block",
+                                "type": "column",
+                                "column": {"children": [text_block(" ")]}
+                            },
+                        ]
+                    }
+                })
+
+        r_page_content = requests.patch(
+            f"{NOTION_BASE_URL}/blocks/{game['id']}/children",
+            headers=notion_headers,
+            data=json.dumps({
+                'children': page_children
+            })
+        )
+
+
+
 
 
 class GameData:
@@ -142,6 +345,10 @@ class GameData:
         self.time_to_beat_main = None
         self.time_to_beat_extra = None
         self.time_to_beat_completionist = None
+
+    @staticmethod
+    def __format_hltb(hltb_string):
+        return hltb_string.replace("Hours", "h").replace("Minutes", "m")
 
     def fetch_data_by_steamid(self, steamid):
 
@@ -214,21 +421,22 @@ class GameData:
             hltb = max(results, key=lambda element: element.similarity)
 
             self.time_to_beat_weblink = hltb.game_web_link
-            self.time_to_beat_main = f"{hltb.gameplay_main} {hltb.gameplay_main_unit}"
-            self.time_to_beat_extra = f"{hltb.gameplay_main_extra} {hltb.gameplay_main_extra_unit}"
-            self.time_to_beat_completionist = f"{hltb.gameplay_completionist} {hltb.gameplay_completionist_unit}"
+            self.time_to_beat_main = GameData.__format_hltb(f"{hltb.gameplay_main} {hltb.gameplay_main_unit}")
+            self.time_to_beat_extra = GameData.__format_hltb(f"{hltb.gameplay_main_extra} {hltb.gameplay_main_extra_unit}")
+            self.time_to_beat_completionist = GameData.__format_hltb(f"{hltb.gameplay_completionist} {hltb.gameplay_completionist_unit}")
         """
 
         # IGDB Data
-        r_creds = requests.post(f"https://id.twitch.tv/oauth2/token?client_id={config.IGDB_CLIENT_ID}&client_secret={config.IGDB_SECRET}&grant_type=client_credentials")
+        r_creds = requests.post(
+            f"https://id.twitch.tv/oauth2/token?client_id={config.IGDB_CLIENT_ID}&client_secret={config.IGDB_SECRET}&grant_type=client_credentials")
 
         if r_creds.status_code == 200:
 
             igdb_token = r_creds.json()['access_token']
 
             r = requests.post(f'{IGDB_BASE_URL}/games',
-                             data=f'fields *; search "{self.name}";',
-                             headers=igdb_headers(igdb_token))
+                              data=f'fields *; search "{self.name}";',
+                              headers=igdb_headers(igdb_token))
 
             if r.status_code == 200 and len(r.json()) > 0:
                 data = r.json()
@@ -244,8 +452,8 @@ class GameData:
 
                 # Wikipedia Link
                 r_website = requests.post(f'{IGDB_BASE_URL}/websites',
-                                  data=f'fields *; where game = {game_id};',
-                                  headers=igdb_headers(igdb_token))
+                                          data=f'fields *; where game = {game_id};',
+                                          headers=igdb_headers(igdb_token))
 
                 if r_website.status_code == 200 and len(r_website.json()) > 0:
                     w_data = r_website.json()
@@ -256,8 +464,8 @@ class GameData:
 
                 # Screenshots
                 r_screen = requests.post(f'{IGDB_BASE_URL}/screenshots',
-                                  data=f'fields *; where game = {game_id};',
-                                  headers=igdb_headers(igdb_token))
+                                         data=f'fields *; where game = {game_id};',
+                                         headers=igdb_headers(igdb_token))
 
                 if r_screen.status_code == 200:
                     self.igdb_images = [f"https:{s['url'].replace('t_thumb', 't_original')}" for s in r_screen.json()]
@@ -272,4 +480,3 @@ class GameData:
 
 if __name__ == "__main__":
     check_and_update_notion()
-
