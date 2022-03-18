@@ -442,7 +442,10 @@ class GameData:
 
 
         # HLTB
-        results = HowLongToBeat().search(self.name.lower())
+        results = HowLongToBeat().search(self.name)
+
+        if results is None or len(results) == 0:
+            results = HowLongToBeat().search(self.name.lower().capitalize())
 
         if results is not None and len(results) > 0:
             hltb = max(results, key=lambda element: element.similarity)
