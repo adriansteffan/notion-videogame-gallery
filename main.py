@@ -184,13 +184,6 @@ def check_and_update_notion():
         if gd.igdb_description is not None:
             page_children.append(text_block(gd.igdb_description))
 
-        # REMOVE ONCE FIXED
-        gd.time_to_beat_weblink = "https://google.com"
-        gd.time_to_beat_main = "50 m"
-        gd.time_to_beat_extra = "5 h"
-        gd.time_to_beat_completionist = "20 h"
-        # REMOVE ONCE FIXED
-
         if gd.time_to_beat_weblink is not None:
 
             page_children.append(text_block(" "))
@@ -346,6 +339,8 @@ class GameData:
 
     @staticmethod
     def __format_hltb(hltb_string):
+        if hltb_string.find("½") >= 2:
+            hltb_string = hltb_string.replace("½", "")
         return hltb_string.replace("Hours", "h").replace("Minutes", "m")
 
     def fetch_data_by_steamid(self, steamid):
@@ -412,9 +407,10 @@ class GameData:
 
     def __fetch_meta_data(self):
 
-        """
+
         # HLTB
-        results = HowLongToBeat().search(self.name)
+        results = HowLongToBeat().search(self.name.lower())
+
         if results is not None and len(results) > 0:
             hltb = max(results, key=lambda element: element.similarity)
 
@@ -422,7 +418,6 @@ class GameData:
             self.time_to_beat_main = GameData.__format_hltb(f"{hltb.gameplay_main} {hltb.gameplay_main_unit}")
             self.time_to_beat_extra = GameData.__format_hltb(f"{hltb.gameplay_main_extra} {hltb.gameplay_main_extra_unit}")
             self.time_to_beat_completionist = GameData.__format_hltb(f"{hltb.gameplay_completionist} {hltb.gameplay_completionist_unit}")
-        """
 
         # IGDB Data
         r_creds = requests.post(
@@ -483,4 +478,5 @@ if __name__ == "__main__":
     while True:
         check_and_update_notion()
         time.sleep(3)
+
 
