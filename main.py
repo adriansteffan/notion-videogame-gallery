@@ -8,7 +8,7 @@ import googleapiclient.discovery
 
 import config
 
-# TODO Documentation, prefer high res icons, credit
+# TODO Documentation, credit
 
 PRIO_ORIGINAL_STEAM_ICONS = False
 
@@ -435,7 +435,14 @@ class GameData:
         if r.status_code != 200 or not r.json()['success'] or len(r.json()['data']) == 0:
             return None, None
 
-        item = r.json()['data'][0]
+        data = r.json()['data']
+
+        # edge case to prefer higher res icons over the first ones
+        if image_type == 'icons':
+            icons_filtered = list(filter(lambda icon: icon['width'] >= 64, data))
+            item = data[0] if len(icons_filtered) == 0 else icons_filtered[0]
+        else:
+            item = data[0]
         return item['url'], item['author']['name']
 
     def __fetch_meta_data(self):
