@@ -31,6 +31,11 @@ def igdb_headers(igdb_token):
     return {'Authorization': f'Bearer {igdb_token}', 'Client-ID': config.IGDB_CLIENT_ID}
 
 
+def strip_non_ascii(string):
+    stripped = (c for c in string if 0 < ord(c) < 127)
+    return ''.join(stripped)
+
+
 def fail_notion(page_id):
     requests.patch(
         f"{NOTION_BASE_URL}/pages/{page_id}",
@@ -460,10 +465,16 @@ class GameData:
         # HLTB
         results = HowLongToBeat().search(self.name)
 
-        if results is None or len(results) == 0:
-            results = HowLongToBeat().search(self.name.lower().capitalize())
+        if not results:
+            results = HowLongToBeat().search(strip_non_ascii(self.name))
 
-        if results is not None and len(results) > 0:
+        if not results:
+            results = HowLongToBeat().search(self.name.lower().title())
+
+        if not results:
+            results = HowLongToBeat().search(strip_non_ascii(self.name).lower().title())
+
+        if results:
             hltb = max(results, key=lambda element: element.similarity)
 
             self.time_to_beat_weblink = hltb.game_web_link
@@ -480,7 +491,7 @@ class GameData:
             igdb_token = r_creds.json()['access_token']
 
             r = requests.post(f'{IGDB_BASE_URL}/games',
-                              data=f'fields *; search "{self.name}";',
+                              data=f'fields *; search "{self.name}";'.encode('utf-8'),
                               headers=igdb_headers(igdb_token))
 
             if r.status_code == 200 and len(r.json()) > 0:
