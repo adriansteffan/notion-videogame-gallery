@@ -8,9 +8,12 @@ import googleapiclient.discovery
 
 import config
 
-# TODO HLTB fix, Autorun, Deployment, Documentation
+# TODO Documentation, prefer high res icons, credit
 
 PRIO_ORIGINAL_STEAM_ICONS = False
+
+LOAD_ALL_OPTION = "Load All"
+LOAD_IMAGES_OPTION = "Load Images"
 
 GRID_BASE_URL = "https://www.steamgriddb.com/api/v2"
 IGDB_BASE_URL = "https://api.igdb.com/v4"
@@ -29,16 +32,42 @@ def igdb_headers(igdb_token):
     return {'Authorization': f'Bearer {igdb_token}', 'Client-ID': config.IGDB_CLIENT_ID}
 
 
+def fail_notion(page_id):
+    requests.patch(
+        f"{NOTION_BASE_URL}/pages/{page_id}",
+        headers=notion_headers,
+        data=json.dumps({
+            "properties": {
+                "Data Fetched": {
+                    "select": {
+                        "name": "Yes"
+                    }
+                }
+            }
+        })
+    )
+
 def check_and_update_notion():
     r_db = requests.post(
         f"{NOTION_BASE_URL}/databases/{config.DATABASE_ID}/query",
         headers=notion_headers,
         data=json.dumps({
             "filter": {
-                "property": "Data Fetched",
-                "select": {
-                    "equals": "Waiting"
-                }
+                "or": [
+                    {
+                        "property": "Data Fetched",
+                        "select": {
+                            "equals": LOAD_IMAGES_OPTION
+                        }
+                    },
+                    {
+                        "property": "Data Fetched",
+                        "select": {
+                            "equals": LOAD_ALL_OPTION
+                        }
+                    }
+                ]
+
             }
         })
     )
@@ -48,12 +77,11 @@ def check_and_update_notion():
 
     for game in r_db.json()['results']:
         gd = GameData()
-
         rt = game['properties']['SteamID']['rich_text']
         if len(rt) == 0 or not rt[0]['plain_text'].isdigit():
             title_list = game['properties']['Name']['title']
-            if len(title_list) == 0:
-                # TODO Failure Condition
+            if len(title_list) == 0:  # failure state
+                fail_notion(game['id'])
                 return
             gd.fetch_data_by_name(title_list[0]['plain_text'])
 
@@ -109,6 +137,11 @@ def check_and_update_notion():
             headers=notion_headers,
             data=json.dumps(update_data)
         )
+
+        # Update page content
+
+        if game['properties']['Data Fetched']['select']['name'] != LOAD_ALL_OPTION:
+            return
 
         page_children = []
 
