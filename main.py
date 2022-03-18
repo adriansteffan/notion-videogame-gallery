@@ -185,10 +185,10 @@ def check_and_update_notion():
             page_children.append(text_block(gd.igdb_description))
 
         # REMOVE ONCE FIXED
-            gd.time_to_beat_weblink = "https://google.com"
-            gd.time_to_beat_main = "50 m"
-            gd.time_to_beat_extra = "5 h"
-            gd.time_to_beat_completionist = "20 h"
+        gd.time_to_beat_weblink = "https://google.com"
+        gd.time_to_beat_main = "50 m"
+        gd.time_to_beat_extra = "5 h"
+        gd.time_to_beat_completionist = "20 h"
         # REMOVE ONCE FIXED
 
         if gd.time_to_beat_weblink is not None:
