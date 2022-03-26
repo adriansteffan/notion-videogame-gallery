@@ -1,3 +1,4 @@
 requests~=2.27.1
 howlongtobeatpy~=0.1.18
 google-api-python-client
+youtube-search

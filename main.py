@@ -4,7 +4,8 @@ import json
 import time
 
 from howlongtobeatpy import HowLongToBeat
-import googleapiclient.discovery
+import googleapiclient.discovery, googleapiclient.errors
+from youtube_search import YoutubeSearch
 
 import config
 
@@ -34,6 +35,29 @@ def igdb_headers(igdb_token):
 def strip_non_ascii(string):
     stripped = (c for c in string if 0 < ord(c) < 127)
     return ''.join(stripped)
+
+
+def cleanup_name(name):
+    return name.replace(u"®", u"").replace(u"™", u"")
+
+
+def get_yt_id_by_name(name):
+    fallback_scraping = False
+    if config.YT_API_KEY != "":
+        youtube = googleapiclient.discovery.build('youtube', 'v3', developerKey=config.YT_API_KEY)
+        yt_req = youtube.search().list(q=f'{name} Trailer', part='snippet', type='video', maxResults=1)
+        try:
+            video_id = yt_req.execute()['items'][0]['id']['videoId']
+            return video_id
+        except googleapiclient.errors.HttpError:
+            fallback_scraping = True
+
+    if fallback_scraping or config.YT_API_KEY == "":
+        results = YoutubeSearch(f'{name} Trailer', max_results=10).to_dict()
+        if len(results) > 0:
+            return results[0]['id']
+
+    return None
 
 
 def fail_notion(page_id):
@@ -156,7 +180,7 @@ def check_and_update_notion():
                         {
                             "type": "text",
                             "text": {
-                                "content": text,
+                                "content": text[:2000],  # Length limit on rich text content - undocumented a of now
                             }
                         }
                     ]
@@ -354,7 +378,6 @@ def check_and_update_notion():
         )
 
 
-
 class GameData:
 
     def __init__(self):
@@ -378,6 +401,7 @@ class GameData:
 
         # Youtube Trailer link
         self.yt_trailer = None
+        self.yt_trailer_video_id = None
 
         # HLTB
         self.time_to_beat_weblink = None
@@ -394,12 +418,12 @@ class GameData:
     def fetch_data_by_steamid(self, steamid):
 
         r = requests.get(f"http://store.steampowered.com/api/appdetails?appids={steamid}")
-        if r.status_code != 200:
-            return False
+        if r.status_code != 200 or not r.json()[str(steamid)]['success']:
+            return False # TODO Handle error outside - update notion to "failed" status
 
         data = r.json()[str(steamid)]['data']
 
-        self.name = data['name']
+        self.name = cleanup_name(data['name'])
         self.front = data['header_image']
         self.hero = f"https://steamcdn-a.akamaihd.net/steam/apps/{steamid}/library_hero.jpg"
 
@@ -424,7 +448,7 @@ class GameData:
         self.name = name
 
         self.icon, self.grid_credits_icon = self.request_image_by_name("icons", {})
-        self.front, self.grid_credits_front = self.request_image_by_name("grids", {'dimensions': ['460x215']})
+        self.front, self.grid_credits_front = self.request_image_by_name("grids", {'dimensions': ['460x215', '920x430']})
         self.hero, self.grid_credits_hero = self.request_image_by_name("heroes", {'dimensions': ["1920x620"]})
 
         self.__fetch_meta_data()
@@ -448,7 +472,16 @@ class GameData:
                          params=params,
                          headers=steamgrid_headers)
         if r.status_code != 200 or not r.json()['success'] or len(r.json()['data']) == 0:
-            return None, None
+
+            if image_type != 'grids':
+                return None, None
+
+            # If no other grid was found, use the yt trailer thumbnail
+            self.yt_trailer_video_id = get_yt_id_by_name(self.name)
+            if self.yt_trailer_video_id:
+                return f"https://i.ytimg.com/vi/{self.yt_trailer_video_id}/maxresdefault.jpg", None
+            else:
+                return None, None
 
         data = r.json()['data']
 
@@ -458,6 +491,7 @@ class GameData:
             item = data[0] if len(icons_filtered) == 0 else icons_filtered[0]
         else:
             item = data[0]
+
         return item['url'], item['author']['name']
 
     def __fetch_meta_data(self):
@@ -486,6 +520,7 @@ class GameData:
         r_creds = requests.post(
             f"https://id.twitch.tv/oauth2/token?client_id={config.IGDB_CLIENT_ID}&client_secret={config.IGDB_SECRET}&grant_type=client_credentials")
 
+
         if r_creds.status_code == 200:
 
             igdb_token = r_creds.json()['access_token']
@@ -503,8 +538,10 @@ class GameData:
                 game_id = igdb_game['id']
 
                 # Plain Meta Data
-                self.release_date = datetime.utcfromtimestamp(int(igdb_game['first_release_date'])).strftime('%d %b %Y')
-                self.igdb_description = igdb_game['summary']
+                if 'first_release_date' in igdb_game.keys():
+                    self.release_date = datetime.utcfromtimestamp(int(igdb_game['first_release_date'])).strftime('%d %b %Y')
+                if 'summary' in igdb_game.keys():
+                    self.igdb_description = igdb_game['summary']
 
                 # Wikipedia Link
                 r_website = requests.post(f'{IGDB_BASE_URL}/websites',
@@ -527,11 +564,10 @@ class GameData:
                     self.igdb_images = [f"https:{s['url'].replace('t_thumb', 't_original')}" for s in r_screen.json()]
 
         # Youtube Trailer link
-        youtube = googleapiclient.discovery.build('youtube', 'v3', developerKey=config.YT_API_KEY)
-        yt_req = youtube.search().list(q=f'{self.name} Trailer', part='snippet', type='video')
-
-        video_id = yt_req.execute()['items'][0]['id']['videoId']
-        self.yt_trailer = f"https://www.youtube.com/watch?v={video_id}"
+        if not self.yt_trailer_video_id:
+            self.yt_trailer_video_id = get_yt_id_by_name(self.name)
+        if self.yt_trailer_video_id:
+            self.yt_trailer = f"https://www.youtube.com/watch?v={self.yt_trailer_video_id}"
 
 
 if __name__ == "__main__":
