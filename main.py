@@ -496,6 +496,7 @@ class GameData:
 
     def __fetch_meta_data(self):
 
+        """ removed until libraries are fixed
         # HLTB
         results = HowLongToBeat().search(self.name)
 
@@ -515,7 +516,7 @@ class GameData:
             self.time_to_beat_main = GameData.__format_hltb(f"{hltb.gameplay_main} {hltb.gameplay_main_unit}")
             self.time_to_beat_extra = GameData.__format_hltb(f"{hltb.gameplay_main_extra} {hltb.gameplay_main_extra_unit}")
             self.time_to_beat_completionist = GameData.__format_hltb(f"{hltb.gameplay_completionist} {hltb.gameplay_completionist_unit}")
-
+        """
         # IGDB Data
         r_creds = requests.post(
             f"https://id.twitch.tv/oauth2/token?client_id={config.IGDB_CLIENT_ID}&client_secret={config.IGDB_SECRET}&grant_type=client_credentials")
