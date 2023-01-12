@@ -3,7 +3,7 @@ from datetime import datetime
 import json
 import time
 
-from howlongtobeatpy import HowLongToBeat
+#from howlongtobeatpy import HowLongToBeat
 import googleapiclient.discovery, googleapiclient.errors
 from youtube_search import YoutubeSearch
 
