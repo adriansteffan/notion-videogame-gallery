@@ -3,7 +3,7 @@ from datetime import datetime
 import json
 import time
 
-#from howlongtobeatpy import HowLongToBeat
+from howlongtobeatpy import HowLongToBeat
 import googleapiclient.discovery, googleapiclient.errors
 from youtube_search import YoutubeSearch
 
@@ -14,6 +14,7 @@ PRIO_ORIGINAL_STEAM_ICONS = False
 
 LOAD_ALL_OPTION = "Load All"
 LOAD_IMAGES_OPTION = "Load Images"
+LOAD_TIME_INFO_OPTION = "Load Time Info"
 
 GRID_BASE_URL = "https://www.steamgriddb.com/api/v2"
 IGDB_BASE_URL = "https://api.igdb.com/v4"
@@ -45,7 +46,7 @@ def get_yt_id_by_name(name):
     fallback_scraping = False
     if config.YT_API_KEY != "":
         youtube = googleapiclient.discovery.build('youtube', 'v3', developerKey=config.YT_API_KEY)
-        yt_req = youtube.search().list(q=f'{name} Trailer', part='snippet', type='video', maxResults=1)
+        yt_req = youtube.search().list(q=f'{name} Game Trailer', part='snippet', type='video', maxResults=1)
         try:
             video_id = yt_req.execute()['items'][0]['id']['videoId']
             return video_id
@@ -53,7 +54,7 @@ def get_yt_id_by_name(name):
             fallback_scraping = True
 
     if fallback_scraping or config.YT_API_KEY == "":
-        results = YoutubeSearch(f'{name} Trailer', max_results=10).to_dict()
+        results = YoutubeSearch(f'{name} Game Trailer', max_results=10).to_dict()
         if len(results) > 0:
             return results[0]['id']
 
@@ -94,6 +95,12 @@ def check_and_update_notion():
                         "select": {
                             "equals": LOAD_ALL_OPTION
                         }
+                    },
+                    {
+                        "property": "Data Fetched",
+                        "select": {
+                            "equals": LOAD_TIME_INFO_OPTION
+                        }
                     }
                 ]
 
@@ -132,34 +139,50 @@ def check_and_update_notion():
             }
         }
 
-        if gd.front is not None:
-            update_data['properties']['Grid'] = {
-                "files": [
-                    {
-                        "type": "external",
-                        "name": "test.jpg",
-                        "external": {
-                            "url": gd.front
+        if game['properties']['Data Fetched']['select']['name'] == LOAD_IMAGES_OPTION or game['properties']['Data Fetched']['select']['name'] == LOAD_ALL_OPTION:
+            if gd.front is not None:
+                update_data['properties']['Grid'] = {
+                    "files": [
+                        {
+                            "type": "external",
+                            "name": "test.jpg",
+                            "external": {
+                                "url": gd.front
+                            }
                         }
+                    ]
+                }
+
+            if gd.icon is not None:
+                update_data['icon'] = {
+                    "type": "external",
+                    "external": {
+                        "url": gd.icon
                     }
-                ]
-            }
-
-        if gd.icon is not None:
-            update_data['icon'] = {
-                "type": "external",
-                "external": {
-                    "url": gd.icon
                 }
-            }
 
-        if gd.hero is not None:
-            update_data['cover'] = {
-                "type": "external",
-                "external": {
-                    "url": gd.hero
+            if gd.hero is not None:
+                update_data['cover'] = {
+                    "type": "external",
+                    "external": {
+                        "url": gd.hero
+                    }
                 }
-            }
+        
+
+        # update game timing info
+        if game['properties']['Data Fetched']['select']['name'] == LOAD_TIME_INFO_OPTION or game['properties']['Data Fetched']['select']['name'] == LOAD_ALL_OPTION:
+            if gd.release_date is not None:
+                update_data['properties']['Release Date'] = {
+                    "date": {
+                        "start": datetime.strptime(gd.release_date, "%d %b %Y").date().isoformat()
+                    }
+                }
+            
+            if gd.time_to_beat_extra is not None and gd.time_to_beat_main is not None:
+                update_data['properties']['HLTB Hours'] = {
+                    "number": round(1/3*gd.time_to_beat_main + 2/3*gd.time_to_beat_extra, 1)
+                }
 
         r_page_props = requests.patch(
             f"{NOTION_BASE_URL}/pages/{game['id']}",
@@ -256,7 +279,7 @@ def check_and_update_notion():
                             {
                                 "type": "text",
                                 "text": {
-                                    "content": "How Long To Beat Data:",
+                                    "content": "How Long To Beat Link",
                                     "link": {"url": gd.time_to_beat_weblink}
                                 },
                                 "annotations": {
@@ -268,36 +291,6 @@ def check_and_update_notion():
                                     "color": "default"
                                 },
                             }
-                        ]
-                    }
-                })
-
-                page_children.append({
-                    "object": "block",
-                    "type": "column_list",
-                    "column_list": {
-                        "children": [
-                            {
-                                "object": "block",
-                                "type": "column",
-                                "column": {"children": [
-                                    callout_block(f"Normal: {gd.time_to_beat_main}", "🏁", "yellow_background")
-                                ]}
-                            },
-                            {
-                                "object": "block",
-                                "type": "column",
-                                "column": {"children": [
-                                    callout_block(f"Main+Extra: {gd.time_to_beat_extra}", "📌", "yellow_background")
-                                ]}
-                            },
-                            {
-                                "object": "block",
-                                "type": "column",
-                                "column": {"children": [
-                                    callout_block(f" Completion: {gd.time_to_beat_completionist}", "✅", "yellow_background")
-                                ]}
-                            },
                         ]
                     }
                 })
@@ -358,13 +351,13 @@ def check_and_update_notion():
                             ]
                         }
                     })
-
-        if gd.grid_credits_icon is not None:
-            page_children.append(text_block(f"Icon Credit: {gd.grid_credits_icon} on SteamGrid"))
-        if gd.grid_credits_front is not None:
-            page_children.append(text_block(f"Grid Credit: {gd.grid_credits_front} on SteamGrid"))
-        if gd.grid_credits_hero is not None:
-            page_children.append(text_block(f"Hero Credit: {gd.grid_credits_hero} on SteamGrid"))
+        if game['properties']['Data Fetched']['select']['name'] == LOAD_IMAGES_OPTION or game['properties']['Data Fetched']['select']['name'] == LOAD_ALL_OPTION:
+            if gd.grid_credits_icon is not None:
+                page_children.append(text_block(f"Icon Credit: {gd.grid_credits_icon} on SteamGrid"))
+            if gd.grid_credits_front is not None:
+                page_children.append(text_block(f"Grid Credit: {gd.grid_credits_front} on SteamGrid"))
+            if gd.grid_credits_hero is not None:
+                page_children.append(text_block(f"Hero Credit: {gd.grid_credits_hero} on SteamGrid"))
 
         if len(page_children) == 0:
             return
@@ -496,7 +489,6 @@ class GameData:
 
     def __fetch_meta_data(self):
 
-        """ removed until libraries are fixed
         # HLTB
         results = HowLongToBeat().search(self.name)
 
@@ -513,10 +505,10 @@ class GameData:
             hltb = max(results, key=lambda element: element.similarity)
 
             self.time_to_beat_weblink = hltb.game_web_link
-            self.time_to_beat_main = GameData.__format_hltb(f"{hltb.gameplay_main} {hltb.gameplay_main_unit}")
-            self.time_to_beat_extra = GameData.__format_hltb(f"{hltb.gameplay_main_extra} {hltb.gameplay_main_extra_unit}")
-            self.time_to_beat_completionist = GameData.__format_hltb(f"{hltb.gameplay_completionist} {hltb.gameplay_completionist_unit}")
-        """
+            self.time_to_beat_main = hltb.main_story
+            self.time_to_beat_extra = hltb.main_extra
+            self.time_to_beat_completionist = hltb.completionist
+        
         # IGDB Data
         r_creds = requests.post(
             f"https://id.twitch.tv/oauth2/token?client_id={config.IGDB_CLIENT_ID}&client_secret={config.IGDB_SECRET}&grant_type=client_credentials")
