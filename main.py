@@ -109,6 +109,7 @@ def check_and_update_notion():
     )
 
     if r_db.status_code != 200:
+        print(r_db.status_code)
         return
 
     for game in r_db.json()['results']:
