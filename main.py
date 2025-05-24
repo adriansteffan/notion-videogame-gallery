@@ -539,13 +539,13 @@ class GameData:
 
                 # Wikipedia Link
                 r_website = requests.post(f'{IGDB_BASE_URL}/websites',
-                                          data=f'fields *; where game = {game_id};',
-                                          headers=igdb_headers(igdb_token))
+                          data=f'fields *; where game = {game_id};',
+                          headers=igdb_headers(igdb_token))
 
                 if r_website.status_code == 200 and len(r_website.json()) > 0:
                     w_data = r_website.json()
                     try:
-                        self.wikipedia_link = w_data[next(i for i, v in enumerate(w_data) if v['category'] == 3)]['url']
+                        self.wikipedia_link = w_data[next(i for i, v in enumerate(w_data) if 'category' in v and v['category'] == 3)]['url']
                     except StopIteration:
                         pass
 
